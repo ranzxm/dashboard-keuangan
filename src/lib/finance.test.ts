@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, test } from "node:test";
 import {
   calculateBudgetSpent,
+  calculateMonthlySeries,
   calculateMonthlyTotal,
   calculateWalletBalance,
   filterTransactions,
@@ -75,5 +76,12 @@ describe("finance calculations", () => {
     });
 
     assert.deepEqual(result, [transactions[1]]);
+  });
+
+  test("builds cumulative monthly chart series from transactions", () => {
+    assert.deepEqual(
+      calculateMonthlySeries(transactions, "2026-06", "expense"),
+      [0, 125000, 125000, 125000, 125000, 125000, 125000],
+    );
   });
 });

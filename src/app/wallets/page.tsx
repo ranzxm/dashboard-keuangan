@@ -67,7 +67,7 @@ export default function WalletsPage(): React.ReactNode {
     setDeletingWallet(wallet);
   };
 
-  const confirmDeleteWallet = (): void => {
+  const confirmDeleteWallet = async (): Promise<void> => {
     if (deletingWallet === null) {
       throw new Error("Wallet yang akan dihapus tidak ditemukan.");
     }
@@ -75,14 +75,14 @@ export default function WalletsPage(): React.ReactNode {
     const deletedWallet = deletingWallet;
 
     try {
-      deleteWallet(deletedWallet.id);
+      await deleteWallet(deletedWallet.id);
       setError(null);
       setDeletingWallet(null);
       showToast({
         message: `Wallet “${deletedWallet.name}” telah dihapus.`,
         actionLabel: "Batalkan",
         duration: 6000,
-        onAction: () => restoreWallet(deletedWallet),
+        onAction: async () => restoreWallet(deletedWallet),
       });
     } catch (caughtError) {
       if (caughtError instanceof Error) {

@@ -26,12 +26,37 @@ export const formatMonth = (value: string): string =>
   }).format(new Date(`${value}-01T00:00:00`));
 
 export const getCurrentMonth = (): string =>
-  new Intl.DateTimeFormat("en-CA", {
-    year: "numeric",
-    month: "2-digit",
-  })
-    .format(new Date())
-    .slice(0, 7);
+  `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, "0")}`;
+
+export const calculateMonthlySeries = (
+  transactions: Transaction[],
+  month: string,
+  type: "income" | "expense",
+): number[] => {
+  const finalDay = new Date(
+    Number(month.slice(0, 4)),
+    Number(month.slice(5, 7)),
+    0,
+  ).getDate();
+  const checkpoints = [1, 5, 10, 15, 20, 25, finalDay];
+
+  return checkpoints.map((checkpoint) =>
+    transactions
+      .filter(
+        (transaction) =>
+          transaction.type === type &&
+          transaction.date.startsWith(month) &&
+          Number(transaction.date.slice(8, 10)) <= checkpoint,
+      )
+      .reduce((total, transaction) => total + transaction.amount, 0),
+  );
+};
+
+export const formatCompactCurrency = (value: number): string =>
+  new Intl.NumberFormat("id-ID", {
+    notation: "compact",
+    maximumFractionDigits: 1,
+  }).format(value);
 
 export const calculateWalletBalance = (
   wallet: Wallet,

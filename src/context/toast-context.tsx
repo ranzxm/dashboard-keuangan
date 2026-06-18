@@ -16,7 +16,7 @@ import { createPortal } from "react-dom";
 type ToastInput = {
   message: string;
   actionLabel: string;
-  onAction: () => void;
+  onAction: () => void | Promise<void>;
   duration: number;
 };
 
@@ -37,6 +37,9 @@ function Toast({
   toast: ToastItem;
   onDismiss: (id: string) => void;
 }): React.ReactNode {
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [isRunningAction, setIsRunningAction] = useState<boolean>(false);
+
   useEffect(() => {
     const timer = window.setTimeout(
       () => onDismiss(toast.id),
@@ -46,9 +49,23 @@ function Toast({
     return () => window.clearTimeout(timer);
   }, [onDismiss, toast.duration, toast.id]);
 
-  const runAction = (): void => {
-    toast.onAction();
-    onDismiss(toast.id);
+  const runAction = async (): Promise<void> => {
+    setActionError(null);
+    setIsRunningAction(true);
+
+    try {
+      await toast.onAction();
+      onDismiss(toast.id);
+    } catch (caughtError) {
+      if (caughtError instanceof Error) {
+        setActionError(caughtError.message);
+        return;
+      }
+
+      throw caughtError;
+    } finally {
+      setIsRunningAction(false);
+    }
   };
 
   return (
@@ -56,10 +73,18 @@ function Toast({
       <div className="toast-icon">
         <CheckCircle2 size={19} />
       </div>
-      <p>{toast.message}</p>
-      <button className="toast-action" type="button" onClick={runAction}>
+      <div className="toast-message">
+        <p>{toast.message}</p>
+        {actionError !== null ? <small>{actionError}</small> : null}
+      </div>
+      <button
+        className="toast-action"
+        disabled={isRunningAction}
+        type="button"
+        onClick={runAction}
+      >
         <RotateCcw size={14} />
-        {toast.actionLabel}
+        {isRunningAction ? "Memulihkan..." : toast.actionLabel}
       </button>
       <button
         aria-label="Tutup notifikasi"

@@ -31,8 +31,11 @@ export function BudgetForm({
     createInitialValue(budget),
   );
   const [error, setError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
 
-  const submit = (event: React.FormEvent<HTMLFormElement>): void => {
+  const submit = async (
+    event: React.FormEvent<HTMLFormElement>,
+  ): Promise<void> => {
     event.preventDefault();
     setError(null);
 
@@ -41,11 +44,13 @@ export function BudgetForm({
       return;
     }
 
+    setIsSubmitting(true);
+
     try {
       if (budget === null) {
-        addBudget(value);
+        await addBudget(value);
       } else {
-        updateBudget(budget.id, value);
+        await updateBudget(budget.id, value);
       }
       onSuccess();
     } catch (caughtError) {
@@ -55,6 +60,8 @@ export function BudgetForm({
       }
 
       throw caughtError;
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -117,8 +124,12 @@ export function BudgetForm({
         <Button variant="secondary" onClick={onCancel}>
           Batal
         </Button>
-        <Button type="submit">
-          {budget === null ? "Simpan budget" : "Simpan perubahan"}
+        <Button disabled={isSubmitting} type="submit">
+          {isSubmitting
+            ? "Menyimpan..."
+            : budget === null
+              ? "Simpan budget"
+              : "Simpan perubahan"}
         </Button>
       </div>
     </form>

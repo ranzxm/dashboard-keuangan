@@ -69,19 +69,19 @@ export default function TransactionsPage(): React.ReactNode {
     setDeletingTransaction(transaction);
   };
 
-  const confirmDeleteTransaction = (): void => {
+  const confirmDeleteTransaction = async (): Promise<void> => {
     if (deletingTransaction === null) {
       throw new Error("Transaksi yang akan dihapus tidak ditemukan.");
     }
 
     const deletedTransaction = deletingTransaction;
-    deleteTransaction(deletedTransaction.id);
+    await deleteTransaction(deletedTransaction.id);
     setDeletingTransaction(null);
     showToast({
       message: `Transaksi “${deletedTransaction.name}” telah dihapus.`,
       actionLabel: "Batalkan",
       duration: 6000,
-      onAction: () => restoreTransaction(deletedTransaction),
+      onAction: async () => restoreTransaction(deletedTransaction),
     });
   };
 

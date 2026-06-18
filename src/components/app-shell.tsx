@@ -5,6 +5,7 @@ import {
   LayoutDashboard,
   Menu,
   PiggyBank,
+  LogOut,
   WalletCards,
   X,
 } from "lucide-react";
@@ -13,6 +14,8 @@ import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
 import { useState } from "react";
 import { ThemeSwitcher } from "@/components/theme-switcher";
+import { authClient } from "@/lib/auth-client";
+import { useFinance } from "@/context/finance-context";
 
 const navigation = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
@@ -28,6 +31,37 @@ export function AppShell({
 }): React.ReactNode {
   const pathname = usePathname();
   const [isMenuOpen, setIsMenuOpen] = useState<boolean>(false);
+  const { error, isReady } = useFinance();
+
+  if (pathname === "/sign-in" || pathname === "/sign-up") {
+    return children;
+  }
+
+  if (!isReady) {
+    return <div className="page-loading"><span /><span /><span /></div>;
+  }
+
+  if (error !== null) {
+    return (
+      <div className="fatal-error">
+        <p className="eyebrow">Koneksi data gagal</p>
+        <h2>Data keuangan tidak dapat dimuat</h2>
+        <p>{error}</p>
+        <button
+          className="button button-primary"
+          type="button"
+          onClick={() => window.location.reload()}
+        >
+          Muat ulang
+        </button>
+      </div>
+    );
+  }
+
+  const signOut = async (): Promise<void> => {
+    await authClient.signOut();
+    window.location.assign("/sign-in");
+  };
 
   return (
     <div className="app-shell">
@@ -74,9 +108,13 @@ export function AppShell({
           <p className="nav-label">Tampilan</p>
           <ThemeSwitcher />
           <div className="sidebar-note">
-            <span>Data tersimpan lokal</span>
-            <small>Aman di perangkat ini</small>
+            <span>Database PostgreSQL</span>
+            <small>Tersinkron ke database</small>
           </div>
+          <button className="sign-out-button" type="button" onClick={signOut}>
+            <LogOut size={16} />
+            Keluar
+          </button>
         </div>
       </aside>
 

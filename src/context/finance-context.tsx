@@ -7,8 +7,7 @@ import {
   useEffect,
   useState,
 } from "react";
-import { initialFinanceState } from "@/data/initial-data";
-import { loadFinanceState, saveFinanceState } from "@/lib/storage";
+import { usePathname } from "next/navigation";
 import type {
   Budget,
   BudgetInput,
@@ -21,69 +20,153 @@ import type {
 
 type FinanceContextValue = FinanceState & {
   isReady: boolean;
-  addTransaction: (input: TransactionInput) => void;
-  updateTransaction: (id: string, input: TransactionInput) => void;
-  deleteTransaction: (id: string) => void;
-  restoreTransaction: (transaction: Transaction) => void;
-  addWallet: (input: WalletInput) => void;
-  updateWallet: (id: string, input: WalletInput) => void;
-  deleteWallet: (id: string) => void;
-  restoreWallet: (wallet: Wallet) => void;
-  addBudget: (input: BudgetInput) => void;
-  updateBudget: (id: string, input: BudgetInput) => void;
-  deleteBudget: (id: string) => void;
-  restoreBudget: (budget: Budget) => void;
+  error: string | null;
+  addTransaction: (input: TransactionInput) => Promise<void>;
+  updateTransaction: (id: string, input: TransactionInput) => Promise<void>;
+  deleteTransaction: (id: string) => Promise<void>;
+  restoreTransaction: (transaction: Transaction) => Promise<void>;
+  addWallet: (input: WalletInput) => Promise<void>;
+  updateWallet: (id: string, input: WalletInput) => Promise<void>;
+  deleteWallet: (id: string) => Promise<void>;
+  restoreWallet: (wallet: Wallet) => Promise<void>;
+  addBudget: (input: BudgetInput) => Promise<void>;
+  updateBudget: (id: string, input: BudgetInput) => Promise<void>;
+  deleteBudget: (id: string) => Promise<void>;
+  restoreBudget: (budget: Budget) => Promise<void>;
+};
+
+type ApiError = {
+  error?: string;
+};
+
+const emptyState: FinanceState = {
+  transactions: [],
+  wallets: [],
+  budgets: [],
 };
 
 const FinanceContext = createContext<FinanceContextValue | null>(null);
 
-const createId = (): string => crypto.randomUUID();
+const request = async <ResponseBody,>(
+  url: string,
+  method: "GET" | "POST" | "PATCH" | "DELETE",
+  body: object | null,
+): Promise<ResponseBody> => {
+  const response = await fetch(url, {
+    method,
+    headers: body === null ? undefined : { "Content-Type": "application/json" },
+    body: body === null ? undefined : JSON.stringify(body),
+  });
+
+  if (response.status === 401) {
+    window.location.assign("/sign-in");
+    throw new Error("Sesi telah berakhir. Silakan masuk kembali.");
+  }
+
+  if (!response.ok) {
+    const result = (await response.json()) as ApiError;
+    throw new Error(
+      result.error ??
+        `Request ${method} ${url} gagal dengan status ${response.status}.`,
+    );
+  }
+
+  if (response.status === 204) {
+    return undefined as ResponseBody;
+  }
+
+  return (await response.json()) as ResponseBody;
+};
 
 export function FinanceProvider({
   children,
 }: {
   children: ReactNode;
 }): React.ReactNode {
-  const [state, setState] = useState<FinanceState>(initialFinanceState);
+  const [state, setState] = useState<FinanceState>(emptyState);
   const [isReady, setIsReady] = useState<boolean>(false);
+  const [error, setError] = useState<string | null>(null);
+  const pathname = usePathname();
 
   useEffect(() => {
-    const timer = window.setTimeout(() => {
-      const storedState = loadFinanceState();
-      setState(storedState ?? initialFinanceState);
-      setIsReady(true);
-    }, 0);
-
-    return () => window.clearTimeout(timer);
-  }, []);
-
-  useEffect(() => {
-    if (isReady) {
-      saveFinanceState(state);
+    if (pathname === "/sign-in" || pathname === "/sign-up") {
+      return;
     }
-  }, [isReady, state]);
 
-  const addTransaction = (input: TransactionInput): void => {
-    const transaction: Transaction = { id: createId(), ...input };
+    const controller = new AbortController();
+
+    const load = async (): Promise<void> => {
+      try {
+        const response = await fetch("/api/finance", {
+          signal: controller.signal,
+        });
+
+        if (response.status === 401) {
+          window.location.assign("/sign-in");
+          return;
+        }
+
+        if (!response.ok) {
+          throw new Error(
+            `Gagal memuat data keuangan dengan status ${response.status}.`,
+          );
+        }
+
+        setState((await response.json()) as FinanceState);
+        setError(null);
+      } catch (caughtError) {
+        if (caughtError instanceof DOMException && caughtError.name === "AbortError") {
+          return;
+        }
+
+        if (caughtError instanceof Error) {
+          setError(caughtError.message);
+          return;
+        }
+
+        throw caughtError;
+      } finally {
+        if (!controller.signal.aborted) {
+          setIsReady(true);
+        }
+      }
+    };
+
+    void load();
+    return () => controller.abort();
+  }, [pathname]);
+
+  const addTransaction = async (input: TransactionInput): Promise<void> => {
+    const transaction = await request<Transaction>(
+      "/api/finance/transactions",
+      "POST",
+      input,
+    );
     setState((current) => ({
       ...current,
       transactions: [transaction, ...current.transactions],
     }));
   };
 
-  const updateTransaction = (
+  const updateTransaction = async (
     id: string,
     input: TransactionInput,
-  ): void => {
+  ): Promise<void> => {
+    const transaction = await request<Transaction>(
+      `/api/finance/transactions/${id}`,
+      "PATCH",
+      input,
+    );
     setState((current) => ({
       ...current,
-      transactions: current.transactions.map((transaction) =>
-        transaction.id === id ? { id, ...input } : transaction,
+      transactions: current.transactions.map((currentTransaction) =>
+        currentTransaction.id === id ? transaction : currentTransaction,
       ),
     }));
   };
 
-  const deleteTransaction = (id: string): void => {
+  const deleteTransaction = async (id: string): Promise<void> => {
+    await request<void>(`/api/finance/transactions/${id}`, "DELETE", null);
     setState((current) => ({
       ...current,
       transactions: current.transactions.filter(
@@ -92,118 +175,115 @@ export function FinanceProvider({
     }));
   };
 
-  const restoreTransaction = (transaction: Transaction): void => {
+  const restoreTransaction = async (
+    transaction: Transaction,
+  ): Promise<void> => {
+    await request<void>(
+      `/api/finance/transactions/${transaction.id}/restore`,
+      "POST",
+      null,
+    );
     setState((current) => ({
       ...current,
-      transactions: current.transactions.some(
-        (currentTransaction) => currentTransaction.id === transaction.id,
-      )
-        ? current.transactions
-        : [transaction, ...current.transactions],
+      transactions: [transaction, ...current.transactions],
     }));
   };
 
-  const addWallet = (input: WalletInput): void => {
-    const wallet: Wallet = { id: createId(), ...input };
+  const addWallet = async (input: WalletInput): Promise<void> => {
+    const wallet = await request<Wallet>(
+      "/api/finance/wallets",
+      "POST",
+      input,
+    );
     setState((current) => ({
       ...current,
       wallets: [...current.wallets, wallet],
     }));
   };
 
-  const updateWallet = (id: string, input: WalletInput): void => {
+  const updateWallet = async (
+    id: string,
+    input: WalletInput,
+  ): Promise<void> => {
+    const wallet = await request<Wallet>(
+      `/api/finance/wallets/${id}`,
+      "PATCH",
+      input,
+    );
     setState((current) => ({
       ...current,
-      wallets: current.wallets.map((wallet) =>
-        wallet.id === id ? { id, ...input } : wallet,
+      wallets: current.wallets.map((currentWallet) =>
+        currentWallet.id === id ? wallet : currentWallet,
       ),
     }));
   };
 
-  const deleteWallet = (id: string): void => {
-    const hasTransactions = state.transactions.some(
-      (transaction) => transaction.walletId === id,
-    );
-
-    if (hasTransactions) {
-      throw new Error(
-        "Wallet tidak dapat dihapus karena masih memiliki transaksi terkait.",
-      );
-    }
-
+  const deleteWallet = async (id: string): Promise<void> => {
+    await request<void>(`/api/finance/wallets/${id}`, "DELETE", null);
     setState((current) => ({
       ...current,
       wallets: current.wallets.filter((wallet) => wallet.id !== id),
     }));
   };
 
-  const restoreWallet = (wallet: Wallet): void => {
+  const restoreWallet = async (wallet: Wallet): Promise<void> => {
+    await request<void>(
+      `/api/finance/wallets/${wallet.id}/restore`,
+      "POST",
+      null,
+    );
     setState((current) => ({
       ...current,
-      wallets: current.wallets.some(
-        (currentWallet) => currentWallet.id === wallet.id,
-      )
-        ? current.wallets
-        : [...current.wallets, wallet],
+      wallets: [...current.wallets, wallet],
     }));
   };
 
-  const addBudget = (input: BudgetInput): void => {
-    const alreadyExists = state.budgets.some(
-      (budget) =>
-        budget.month === input.month && budget.category === input.category,
+  const addBudget = async (input: BudgetInput): Promise<void> => {
+    const budget = await request<Budget>(
+      "/api/finance/budgets",
+      "POST",
+      input,
     );
-
-    if (alreadyExists) {
-      throw new Error(
-        `Budget ${input.category} untuk bulan ${input.month} sudah tersedia.`,
-      );
-    }
-
-    const budget: Budget = { id: createId(), ...input };
     setState((current) => ({
       ...current,
       budgets: [...current.budgets, budget],
     }));
   };
 
-  const updateBudget = (id: string, input: BudgetInput): void => {
-    const alreadyExists = state.budgets.some(
-      (budget) =>
-        budget.id !== id &&
-        budget.month === input.month &&
-        budget.category === input.category,
+  const updateBudget = async (
+    id: string,
+    input: BudgetInput,
+  ): Promise<void> => {
+    const budget = await request<Budget>(
+      `/api/finance/budgets/${id}`,
+      "PATCH",
+      input,
     );
-
-    if (alreadyExists) {
-      throw new Error(
-        `Budget ${input.category} untuk bulan ${input.month} sudah tersedia.`,
-      );
-    }
-
     setState((current) => ({
       ...current,
-      budgets: current.budgets.map((budget) =>
-        budget.id === id ? { id, ...input } : budget,
+      budgets: current.budgets.map((currentBudget) =>
+        currentBudget.id === id ? budget : currentBudget,
       ),
     }));
   };
 
-  const deleteBudget = (id: string): void => {
+  const deleteBudget = async (id: string): Promise<void> => {
+    await request<void>(`/api/finance/budgets/${id}`, "DELETE", null);
     setState((current) => ({
       ...current,
       budgets: current.budgets.filter((budget) => budget.id !== id),
     }));
   };
 
-  const restoreBudget = (budget: Budget): void => {
+  const restoreBudget = async (budget: Budget): Promise<void> => {
+    await request<void>(
+      `/api/finance/budgets/${budget.id}/restore`,
+      "POST",
+      null,
+    );
     setState((current) => ({
       ...current,
-      budgets: current.budgets.some(
-        (currentBudget) => currentBudget.id === budget.id,
-      )
-        ? current.budgets
-        : [...current.budgets, budget],
+      budgets: [...current.budgets, budget],
     }));
   };
 
@@ -212,6 +292,7 @@ export function FinanceProvider({
       value={{
         ...state,
         isReady,
+        error,
         addTransaction,
         updateTransaction,
         deleteTransaction,

@@ -1,7 +1,7 @@
 "use client";
 
 import { AlertTriangle, Trash2, X } from "lucide-react";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 
 export function ConfirmDialog({
@@ -16,10 +16,12 @@ export function ConfirmDialog({
   description: string;
   isOpen: boolean;
   onCancel: () => void;
-  onConfirm: () => void;
+  onConfirm: () => void | Promise<void>;
   title: string;
 }): React.ReactNode {
   const cancelButtonRef = useRef<HTMLButtonElement>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [isConfirming, setIsConfirming] = useState<boolean>(false);
 
   useEffect(() => {
     if (!isOpen) {
@@ -45,6 +47,24 @@ export function ConfirmDialog({
   if (!isOpen) {
     return null;
   }
+
+  const confirm = async (): Promise<void> => {
+    setError(null);
+    setIsConfirming(true);
+
+    try {
+      await onConfirm();
+    } catch (caughtError) {
+      if (caughtError instanceof Error) {
+        setError(caughtError.message);
+        return;
+      }
+
+      throw caughtError;
+    } finally {
+      setIsConfirming(false);
+    }
+  };
 
   return (
     <div
@@ -76,17 +96,23 @@ export function ConfirmDialog({
           <h2 id="confirm-dialog-title">{title}</h2>
           <p id="confirm-dialog-description">{description}</p>
         </div>
+        {error !== null ? <p className="error-message">{error}</p> : null}
         <div className="confirm-dialog-actions">
           <Button
+            disabled={isConfirming}
             ref={cancelButtonRef}
             variant="secondary"
             onClick={onCancel}
           >
             Batal
           </Button>
-          <Button variant="danger" onClick={onConfirm}>
+          <Button
+            disabled={isConfirming}
+            variant="danger"
+            onClick={confirm}
+          >
             <Trash2 size={16} />
-            {confirmLabel}
+            {isConfirming ? "Menghapus..." : confirmLabel}
           </Button>
         </div>
       </div>

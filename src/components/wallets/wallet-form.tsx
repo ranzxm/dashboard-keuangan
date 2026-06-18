@@ -29,8 +29,11 @@ export function WalletForm({
     createInitialValue(wallet),
   );
   const [error, setError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
 
-  const submit = (event: React.FormEvent<HTMLFormElement>): void => {
+  const submit = async (
+    event: React.FormEvent<HTMLFormElement>,
+  ): Promise<void> => {
     event.preventDefault();
     setError(null);
 
@@ -44,13 +47,25 @@ export function WalletForm({
       name: value.name.trim(),
     };
 
-    if (wallet === null) {
-      addWallet(input);
-    } else {
-      updateWallet(wallet.id, input);
-    }
+    setIsSubmitting(true);
 
-    onSuccess();
+    try {
+      if (wallet === null) {
+        await addWallet(input);
+      } else {
+        await updateWallet(wallet.id, input);
+      }
+      onSuccess();
+    } catch (caughtError) {
+      if (caughtError instanceof Error) {
+        setError(caughtError.message);
+        return;
+      }
+
+      throw caughtError;
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -111,8 +126,12 @@ export function WalletForm({
         <Button variant="secondary" onClick={onCancel}>
           Batal
         </Button>
-        <Button type="submit">
-          {wallet === null ? "Simpan wallet" : "Simpan perubahan"}
+        <Button disabled={isSubmitting} type="submit">
+          {isSubmitting
+            ? "Menyimpan..."
+            : wallet === null
+              ? "Simpan wallet"
+              : "Simpan perubahan"}
         </Button>
       </div>
     </form>

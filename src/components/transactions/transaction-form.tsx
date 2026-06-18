@@ -58,8 +58,11 @@ export function TransactionForm({
     };
   });
   const [error, setError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
 
-  const submit = (event: React.FormEvent<HTMLFormElement>): void => {
+  const submit = async (
+    event: React.FormEvent<HTMLFormElement>,
+  ): Promise<void> => {
     event.preventDefault();
     setError(null);
 
@@ -84,13 +87,25 @@ export function TransactionForm({
       note: value.note?.trim() || null,
     };
 
-    if (transaction === null) {
-      addTransaction(input);
-    } else {
-      updateTransaction(transaction.id, input);
-    }
+    setIsSubmitting(true);
 
-    onSuccess();
+    try {
+      if (transaction === null) {
+        await addTransaction(input);
+      } else {
+        await updateTransaction(transaction.id, input);
+      }
+      onSuccess();
+    } catch (caughtError) {
+      if (caughtError instanceof Error) {
+        setError(caughtError.message);
+        return;
+      }
+
+      throw caughtError;
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -216,8 +231,12 @@ export function TransactionForm({
         <Button variant="secondary" onClick={onCancel}>
           Batal
         </Button>
-        <Button type="submit">
-          {transaction === null ? "Simpan transaksi" : "Simpan perubahan"}
+        <Button disabled={isSubmitting} type="submit">
+          {isSubmitting
+            ? "Menyimpan..."
+            : transaction === null
+              ? "Simpan transaksi"
+              : "Simpan perubahan"}
         </Button>
       </div>
     </form>

@@ -66,19 +66,19 @@ export default function BudgetPage(): React.ReactNode {
     setDeletingBudget(budget);
   };
 
-  const confirmDeleteBudget = (): void => {
+  const confirmDeleteBudget = async (): Promise<void> => {
     if (deletingBudget === null) {
       throw new Error("Budget yang akan dihapus tidak ditemukan.");
     }
 
     const deletedBudget = deletingBudget;
-    deleteBudget(deletedBudget.id);
+    await deleteBudget(deletedBudget.id);
     setDeletingBudget(null);
     showToast({
       message: `Budget ${deletedBudget.category} telah dihapus.`,
       actionLabel: "Batalkan",
       duration: 6000,
-      onAction: () => restoreBudget(deletedBudget),
+      onAction: async () => restoreBudget(deletedBudget),
     });
   };
 

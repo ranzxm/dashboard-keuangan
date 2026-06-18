@@ -14,8 +14,10 @@ import { TransactionTable } from "@/components/transactions/transaction-table";
 import { useFinance } from "@/context/finance-context";
 import {
   calculateBudgetSpent,
+  calculateMonthlySeries,
   calculateMonthlyTotal,
   calculateTotalBalance,
+  formatCompactCurrency,
   formatCurrency,
   getCurrentMonth,
   sortTransactionsNewest,
@@ -25,8 +27,8 @@ const chartPoints = (
   values: number[],
   width: number,
   height: number,
+  maximum: number,
 ): string => {
-  const maximum = Math.max(...values, 1);
   const step = width / (values.length - 1);
 
   return values
@@ -56,8 +58,16 @@ export default function DashboardPage(): React.ReactNode {
   );
   const remainingBudget = budgetLimit - budgetSpent;
   const recentTransactions = sortTransactionsNewest(transactions).slice(0, 5);
-  const incomeChart = [0, 12.5, 12.5, 12.5, 15.25, 15.25, 15.25];
-  const expenseChart = [0.25, 1.35, 1.8, 2.35, 2.45, 2.7, 2.8];
+  const incomeChart = calculateMonthlySeries(transactions, month, "income");
+  const expenseChart = calculateMonthlySeries(
+    transactions,
+    month,
+    "expense",
+  );
+  const chartMaximum = Math.max(...incomeChart, ...expenseChart, 1);
+  const chartLabels = [1, 0.75, 0.5, 0.25, 0].map((ratio) =>
+    formatCompactCurrency(chartMaximum * ratio),
+  );
 
   const metrics = [
     {
@@ -138,11 +148,9 @@ export default function DashboardPage(): React.ReactNode {
           </div>
           <div className="chart-area">
             <div className="chart-y-labels">
-              <span>16 jt</span>
-              <span>12 jt</span>
-              <span>8 jt</span>
-              <span>4 jt</span>
-              <span>0</span>
+              {chartLabels.map((label) => (
+                <span key={label}>{label}</span>
+              ))}
             </div>
             <svg
               aria-label="Grafik pemasukan dan pengeluaran bulan ini"
@@ -169,11 +177,11 @@ export default function DashboardPage(): React.ReactNode {
               ))}
               <polygon
                 fill="url(#income-fill)"
-                points={`0,220 ${chartPoints(incomeChart, 640, 220)} 640,220`}
+                points={`0,220 ${chartPoints(incomeChart, 640, 220, chartMaximum)} 640,220`}
               />
               <polyline
                 fill="none"
-                points={chartPoints(incomeChart, 640, 220)}
+                points={chartPoints(incomeChart, 640, 220, chartMaximum)}
                 stroke="var(--income)"
                 strokeLinecap="round"
                 strokeLinejoin="round"
@@ -181,7 +189,7 @@ export default function DashboardPage(): React.ReactNode {
               />
               <polyline
                 fill="none"
-                points={chartPoints(expenseChart, 640, 220)}
+                points={chartPoints(expenseChart, 640, 220, chartMaximum)}
                 stroke="var(--expense)"
                 strokeLinecap="round"
                 strokeLinejoin="round"
