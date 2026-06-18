@@ -11,10 +11,15 @@ import { Modal } from "@/components/ui/modal";
 import { useFinance } from "@/context/finance-context";
 import { useToast } from "@/context/toast-context";
 import {
+  addMoney,
   calculateBudgetSpent,
+  divideMoney,
   formatCurrency,
   formatMonth,
   getCurrentMonth,
+  isNegativeMoney,
+  parseMoney,
+  subtractMoney,
 } from "@/lib/finance";
 import type { Budget } from "@/types/finance";
 
@@ -25,6 +30,7 @@ export default function BudgetPage(): React.ReactNode {
   const [editingBudget, setEditingBudget] = useState<Budget | null>(null);
   const [deletingBudget, setDeletingBudget] = useState<Budget | null>(null);
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
+  const [error, setError] = useState<string | null>(null);
 
   const visibleBudgets = useMemo(
     () =>
@@ -40,12 +46,13 @@ export default function BudgetPage(): React.ReactNode {
     (summary, budget) => {
       const spent = calculateBudgetSpent(budget, transactions);
       return {
-        limit: summary.limit + budget.limit,
-        spent: summary.spent + spent,
+        limit: addMoney(summary.limit, budget.limit),
+        spent: addMoney(summary.spent, spent),
       };
     },
-    { limit: 0, spent: 0 },
+    { limit: BigInt(0), spent: BigInt(0) },
   );
+  const remainingTotal = subtractMoney(totals.limit, totals.spent);
 
   const openCreateModal = (): void => {
     setEditingBudget(null);
@@ -72,14 +79,26 @@ export default function BudgetPage(): React.ReactNode {
     }
 
     const deletedBudget = deletingBudget;
-    await deleteBudget(deletedBudget.id);
-    setDeletingBudget(null);
-    showToast({
-      message: `Budget ${deletedBudget.category} telah dihapus.`,
-      actionLabel: "Batalkan",
-      duration: 6000,
-      onAction: async () => restoreBudget(deletedBudget),
-    });
+
+    try {
+      await deleteBudget(deletedBudget.id);
+      setError(null);
+      setDeletingBudget(null);
+      showToast({
+        message: `Budget ${deletedBudget.category} telah dihapus.`,
+        actionLabel: "Batalkan",
+        duration: 6000,
+        onAction: async () => restoreBudget(deletedBudget),
+      });
+    } catch (caughtError) {
+      if (caughtError instanceof Error) {
+        setError(caughtError.message);
+        setDeletingBudget(null);
+        return;
+      }
+
+      throw caughtError;
+    }
   };
 
   return (
@@ -95,6 +114,15 @@ export default function BudgetPage(): React.ReactNode {
           Tambah budget
         </Button>
       </header>
+
+      {error !== null ? (
+        <div className="page-error">
+          <span>{error}</span>
+          <button type="button" onClick={() => setError(null)}>
+            Tutup
+          </button>
+        </div>
+      ) : null}
 
       <div className="budget-toolbar">
         <label>
@@ -120,20 +148,16 @@ export default function BudgetPage(): React.ReactNode {
             {formatCurrency(totals.spent)}
           </strong>
           <small>
-            {totals.limit === 0
+            {totals.limit === BigInt(0)
               ? 0
-              : Math.round((totals.spent / totals.limit) * 100)}
+              : Math.round(divideMoney(totals.spent, totals.limit) * 100)}
             % dari limit
           </small>
         </Card>
         <Card>
           <span>Sisa budget</span>
-          <strong
-            className={
-              totals.limit - totals.spent < 0 ? "amount-expense" : ""
-            }
-          >
-            {formatCurrency(totals.limit - totals.spent)}
+          <strong className={isNegativeMoney(remainingTotal) ? "amount-expense" : ""}>
+            {formatCurrency(remainingTotal)}
           </strong>
           <small>{formatMonth(selectedMonth)}</small>
         </Card>
@@ -151,8 +175,10 @@ export default function BudgetPage(): React.ReactNode {
         <div className="budget-grid">
           {visibleBudgets.map((budget) => {
             const spent = calculateBudgetSpent(budget, transactions);
-            const remaining = budget.limit - spent;
-            const percentage = Math.round((spent / budget.limit) * 100);
+            const remaining = subtractMoney(budget.limit, spent);
+            const percentage = Math.round(
+              divideMoney(spent, parseMoney(budget.limit)) * 100,
+            );
             const status =
               percentage >= 100
                 ? "Terlewati"
@@ -195,7 +221,9 @@ export default function BudgetPage(): React.ReactNode {
                   </div>
                   <div>
                     <span>Sisa</span>
-                    <strong className={remaining < 0 ? "amount-expense" : ""}>
+                    <strong
+                      className={isNegativeMoney(remaining) ? "amount-expense" : ""}
+                    >
                       {formatCurrency(remaining)}
                     </strong>
                   </div>

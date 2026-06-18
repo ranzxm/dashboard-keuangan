@@ -6,11 +6,12 @@ import { FormField } from "@/components/ui/form-field";
 import { useFinance } from "@/context/finance-context";
 import { expenseCategories } from "@/data/initial-data";
 import { getCurrentMonth } from "@/lib/finance";
+import type { Money } from "@/types/finance";
 import type { Budget, BudgetInput } from "@/types/finance";
 
 const createInitialValue = (budget: Budget | null): BudgetInput =>
   budget === null
-    ? { month: getCurrentMonth(), category: "Makanan", limit: 0 }
+    ? { month: getCurrentMonth(), category: "Makanan", limit: "0" }
     : {
         month: budget.month,
         category: budget.category,
@@ -39,7 +40,7 @@ export function BudgetForm({
     event.preventDefault();
     setError(null);
 
-    if (value.limit <= 0) {
+    if (!/^\d+$/.test(value.limit) || BigInt(value.limit) <= BigInt(0)) {
       setError("Limit budget harus lebih besar dari nol.");
       return;
     }
@@ -108,11 +109,13 @@ export function BudgetForm({
               min="1"
               placeholder="0"
               type="number"
-              value={value.limit || ""}
+              inputMode="numeric"
+              step="1"
+              value={value.limit === "0" ? "" : value.limit}
               onChange={(event) =>
                 setValue((current) => ({
                   ...current,
-                  limit: Number(event.target.value),
+                  limit: sanitizeMoneyInput(event.target.value),
                 }))
               }
             />
@@ -135,3 +138,9 @@ export function BudgetForm({
     </form>
   );
 }
+
+const sanitizeMoneyInput = (value: string): Money => {
+  const digits = value.replace(/\D/g, "");
+
+  return digits === "" ? "0" : digits;
+};

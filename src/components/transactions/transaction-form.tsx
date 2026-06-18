@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { FormField } from "@/components/ui/form-field";
 import { transactionCategories } from "@/data/initial-data";
 import { useFinance } from "@/context/finance-context";
+import type { Money } from "@/types/finance";
 import type {
   Transaction,
   TransactionInput,
@@ -29,14 +30,14 @@ const createInitialValue = (
   }
 
   return {
-    date: today(),
-    name: "",
-    type: "expense",
-    category: "Makanan",
-    amount: 0,
-    walletId: "",
-    note: null,
-  };
+      date: today(),
+      name: "",
+      type: "expense",
+      category: "Makanan",
+      amount: "0",
+      walletId: "",
+      note: null,
+    };
 };
 
 export function TransactionForm({
@@ -71,7 +72,7 @@ export function TransactionForm({
       return;
     }
 
-    if (value.amount <= 0) {
+    if (!/^\d+$/.test(value.amount) || BigInt(value.amount) <= BigInt(0)) {
       setError("Nominal transaksi harus lebih besar dari nol.");
       return;
     }
@@ -179,11 +180,13 @@ export function TransactionForm({
             min="1"
             placeholder="0"
             type="number"
-            value={value.amount || ""}
+            inputMode="numeric"
+            step="1"
+            value={value.amount === "0" ? "" : value.amount}
             onChange={(event) =>
               setValue((current) => ({
                 ...current,
-                amount: Number(event.target.value),
+                amount: sanitizeMoneyInput(event.target.value),
               }))
             }
           />
@@ -242,3 +245,9 @@ export function TransactionForm({
     </form>
   );
 }
+
+const sanitizeMoneyInput = (value: string): Money => {
+  const digits = value.replace(/\D/g, "");
+
+  return digits === "" ? "0" : digits;
+};

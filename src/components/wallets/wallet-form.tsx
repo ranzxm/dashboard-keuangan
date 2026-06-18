@@ -4,11 +4,12 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { FormField } from "@/components/ui/form-field";
 import { useFinance } from "@/context/finance-context";
+import type { Money } from "@/types/finance";
 import type { Wallet, WalletInput, WalletType } from "@/types/finance";
 
 const createInitialValue = (wallet: Wallet | null): WalletInput =>
   wallet === null
-    ? { name: "", type: "bank", initialBalance: 0 }
+    ? { name: "", type: "bank", initialBalance: "0" }
     : {
         name: wallet.name,
         type: wallet.type,
@@ -39,6 +40,11 @@ export function WalletForm({
 
     if (value.name.trim() === "") {
       setError("Nama wallet wajib diisi.");
+      return;
+    }
+
+    if (!/^\d+$/.test(value.initialBalance)) {
+      setError("Saldo awal harus berupa angka bulat tanpa desimal.");
       return;
     }
 
@@ -110,11 +116,13 @@ export function WalletForm({
               min="0"
               placeholder="0"
               type="number"
-              value={value.initialBalance || ""}
+              inputMode="numeric"
+              step="1"
+              value={value.initialBalance === "0" ? "" : value.initialBalance}
               onChange={(event) =>
                 setValue((current) => ({
                   ...current,
-                  initialBalance: Number(event.target.value),
+                  initialBalance: sanitizeMoneyInput(event.target.value),
                 }))
               }
             />
@@ -137,3 +145,9 @@ export function WalletForm({
     </form>
   );
 }
+
+const sanitizeMoneyInput = (value: string): Money => {
+  const digits = value.replace(/\D/g, "");
+
+  return digits === "" ? "0" : digits;
+};

@@ -43,6 +43,7 @@ export default function TransactionsPage(): React.ReactNode {
   const [deletingTransaction, setDeletingTransaction] =
     useState<Transaction | null>(null);
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
+  const [error, setError] = useState<string | null>(null);
 
   const filteredTransactions = useMemo(
     () =>
@@ -75,14 +76,26 @@ export default function TransactionsPage(): React.ReactNode {
     }
 
     const deletedTransaction = deletingTransaction;
-    await deleteTransaction(deletedTransaction.id);
-    setDeletingTransaction(null);
-    showToast({
-      message: `Transaksi “${deletedTransaction.name}” telah dihapus.`,
-      actionLabel: "Batalkan",
-      duration: 6000,
-      onAction: async () => restoreTransaction(deletedTransaction),
-    });
+
+    try {
+      await deleteTransaction(deletedTransaction.id);
+      setError(null);
+      setDeletingTransaction(null);
+      showToast({
+        message: `Transaksi “${deletedTransaction.name}” telah dihapus.`,
+        actionLabel: "Batalkan",
+        duration: 6000,
+        onAction: async () => restoreTransaction(deletedTransaction),
+      });
+    } catch (caughtError) {
+      if (caughtError instanceof Error) {
+        setError(caughtError.message);
+        setDeletingTransaction(null);
+        return;
+      }
+
+      throw caughtError;
+    }
   };
 
   return (
@@ -98,6 +111,15 @@ export default function TransactionsPage(): React.ReactNode {
           Tambah transaksi
         </Button>
       </header>
+
+      {error !== null ? (
+        <div className="page-error">
+          <span>{error}</span>
+          <button type="button" onClick={() => setError(null)}>
+            Tutup
+          </button>
+        </div>
+      ) : null}
 
       <Card className="filters-card">
         <div className="filters-title">

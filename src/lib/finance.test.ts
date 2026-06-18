@@ -6,6 +6,7 @@ import {
   calculateMonthlyTotal,
   calculateWalletBalance,
   filterTransactions,
+  formatMoney,
 } from "@/lib/finance";
 import type { Budget, Transaction, Wallet } from "@/types/finance";
 
@@ -13,7 +14,7 @@ const wallet: Wallet = {
   id: "wallet-1",
   name: "Bank",
   type: "bank",
-  initialBalance: 1000000,
+  initialBalance: "1000000",
 };
 
 const transactions: Transaction[] = [
@@ -23,7 +24,7 @@ const transactions: Transaction[] = [
     name: "Income",
     type: "income",
     category: "Gaji",
-    amount: 500000,
+    amount: "500000",
     walletId: wallet.id,
     note: null,
   },
@@ -33,7 +34,7 @@ const transactions: Transaction[] = [
     name: "Expense",
     type: "expense",
     category: "Makanan",
-    amount: 125000,
+    amount: "125000",
     walletId: wallet.id,
     note: null,
   },
@@ -41,17 +42,17 @@ const transactions: Transaction[] = [
 
 describe("finance calculations", () => {
   test("calculates wallet balance from related transactions", () => {
-    assert.equal(calculateWalletBalance(wallet, transactions), 1375000);
+    assert.equal(calculateWalletBalance(wallet, transactions), BigInt(1375000));
   });
 
   test("calculates monthly totals by transaction type", () => {
     assert.equal(
       calculateMonthlyTotal(transactions, "2026-06", "income"),
-      500000,
+      BigInt(500000),
     );
     assert.equal(
       calculateMonthlyTotal(transactions, "2026-06", "expense"),
-      125000,
+      BigInt(125000),
     );
   });
 
@@ -60,10 +61,10 @@ describe("finance calculations", () => {
       id: "budget-1",
       month: "2026-06",
       category: "Makanan",
-      limit: 300000,
+      limit: "300000",
     };
 
-    assert.equal(calculateBudgetSpent(budget, transactions), 125000);
+    assert.equal(calculateBudgetSpent(budget, transactions), BigInt(125000));
   });
 
   test("filters transactions using all supported criteria", () => {
@@ -81,7 +82,19 @@ describe("finance calculations", () => {
   test("builds cumulative monthly chart series from transactions", () => {
     assert.deepEqual(
       calculateMonthlySeries(transactions, "2026-06", "expense"),
-      [0, 125000, 125000, 125000, 125000, 125000, 125000],
+      [
+        BigInt(0),
+        BigInt(125000),
+        BigInt(125000),
+        BigInt(125000),
+        BigInt(125000),
+        BigInt(125000),
+        BigInt(125000),
+      ],
     );
+  });
+
+  test("formats bigint money values back to API-safe strings", () => {
+    assert.equal(formatMoney(BigInt("9007199254740993")), "9007199254740993");
   });
 });

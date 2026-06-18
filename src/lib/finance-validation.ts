@@ -2,12 +2,21 @@ import { z } from "zod";
 
 const datePattern = /^\d{4}-\d{2}-\d{2}$/;
 const monthPattern = /^\d{4}-\d{2}$/;
-const positiveMoney = z.number().int().positive().max(Number.MAX_SAFE_INTEGER);
+const moneyPattern = /^\d+$/;
+const positiveMoney = z
+  .string()
+  .regex(moneyPattern, "Nominal harus berupa angka bulat tanpa desimal.")
+  .refine(
+    (value) => BigInt(value) > BigInt(0),
+    "Nominal harus lebih besar dari nol.",
+  );
 const nonNegativeMoney = z
-  .number()
-  .int()
-  .nonnegative()
-  .max(Number.MAX_SAFE_INTEGER);
+  .string()
+  .regex(moneyPattern, "Nominal harus berupa angka bulat tanpa desimal.")
+  .refine(
+    (value) => BigInt(value) >= BigInt(0),
+    "Nominal tidak boleh kurang dari nol.",
+  );
 
 export const transactionInputSchema = z.object({
   date: z.string().regex(datePattern, "Tanggal harus menggunakan format YYYY-MM-DD."),

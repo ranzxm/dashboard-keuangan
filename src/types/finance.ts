@@ -2,13 +2,15 @@ export type TransactionType = "income" | "expense";
 
 export type WalletType = "cash" | "bank" | "e-wallet" | "other";
 
+export type Money = string;
+
 export type Transaction = {
   id: string;
   date: string;
   name: string;
   type: TransactionType;
   category: string;
-  amount: number;
+  amount: Money;
   walletId: string;
   note: string | null;
 };
@@ -17,14 +19,14 @@ export type Wallet = {
   id: string;
   name: string;
   type: WalletType;
-  initialBalance: number;
+  initialBalance: Money;
 };
 
 export type Budget = {
   id: string;
   month: string;
   category: string;
-  limit: number;
+  limit: Money;
 };
 
 export type FinanceState = {

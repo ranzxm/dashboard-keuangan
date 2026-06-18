@@ -123,7 +123,7 @@ export const wallets = pgTable(
       .references(() => user.id, { onDelete: "cascade" }),
     name: text("name").notNull(),
     type: walletTypeEnum("type").notNull(),
-    initialBalance: bigint("initial_balance", { mode: "number" }).notNull(),
+    initialBalance: bigint("initial_balance", { mode: "bigint" }).notNull(),
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()
       .notNull(),
@@ -154,7 +154,7 @@ export const transactions = pgTable(
     name: text("name").notNull(),
     type: transactionTypeEnum("type").notNull(),
     category: text("category").notNull(),
-    amount: bigint("amount", { mode: "number" }).notNull(),
+    amount: bigint("amount", { mode: "bigint" }).notNull(),
     note: text("note"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()
@@ -179,7 +179,7 @@ export const budgets = pgTable(
       .references(() => user.id, { onDelete: "cascade" }),
     month: text("month").notNull(),
     category: text("category").notNull(),
-    limit: bigint("limit", { mode: "number" }).notNull(),
+    limit: bigint("limit", { mode: "bigint" }).notNull(),
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()
       .notNull(),

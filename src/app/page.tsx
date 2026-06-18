@@ -13,28 +13,35 @@ import { Card } from "@/components/ui/card";
 import { TransactionTable } from "@/components/transactions/transaction-table";
 import { useFinance } from "@/context/finance-context";
 import {
+  addMoney,
   calculateBudgetSpent,
   calculateMonthlySeries,
   calculateMonthlyTotal,
   calculateTotalBalance,
+  divideMoney,
   formatCompactCurrency,
   formatCurrency,
   getCurrentMonth,
+  isNegativeMoney,
+  moneyToNumber,
+  parseMoney,
   sortTransactionsNewest,
+  subtractMoney,
 } from "@/lib/finance";
 
 const chartPoints = (
-  values: number[],
+  values: bigint[],
   width: number,
   height: number,
-  maximum: number,
+  maximum: bigint,
 ): string => {
   const step = width / (values.length - 1);
+  const maximumValue = moneyToNumber(maximum);
 
   return values
     .map((value, index) => {
       const x = index * step;
-      const y = height - (value / maximum) * (height - 12) - 6;
+      const y = height - (moneyToNumber(value) / maximumValue) * (height - 12) - 6;
       return `${x},${y}`;
     })
     .join(" ");
@@ -48,15 +55,15 @@ export default function DashboardPage(): React.ReactNode {
   const totalBalance = calculateTotalBalance(wallets, transactions);
   const monthlyBudgets = budgets.filter((budget) => budget.month === month);
   const budgetLimit = monthlyBudgets.reduce(
-    (total, budget) => total + budget.limit,
-    0,
+    (total, budget) => addMoney(total, budget.limit),
+    BigInt(0),
   );
   const budgetSpent = monthlyBudgets.reduce(
     (total, budget) =>
-      total + calculateBudgetSpent(budget, transactions),
-    0,
+      addMoney(total, calculateBudgetSpent(budget, transactions)),
+    BigInt(0),
   );
-  const remainingBudget = budgetLimit - budgetSpent;
+  const remainingBudget = subtractMoney(budgetLimit, budgetSpent);
   const recentTransactions = sortTransactionsNewest(transactions).slice(0, 5);
   const incomeChart = calculateMonthlySeries(transactions, month, "income");
   const expenseChart = calculateMonthlySeries(
@@ -64,9 +71,12 @@ export default function DashboardPage(): React.ReactNode {
     month,
     "expense",
   );
-  const chartMaximum = Math.max(...incomeChart, ...expenseChart, 1);
+  const chartMaximum = [BigInt(1), ...incomeChart, ...expenseChart].reduce(
+    (maximum, value) => (value > maximum ? value : maximum),
+    BigInt(1),
+  );
   const chartLabels = [1, 0.75, 0.5, 0.25, 0].map((ratio) =>
-    formatCompactCurrency(chartMaximum * ratio),
+    formatCompactCurrency(BigInt(Math.round(moneyToNumber(chartMaximum) * ratio))),
   );
 
   const metrics = [
@@ -87,7 +97,7 @@ export default function DashboardPage(): React.ReactNode {
     {
       label: "Pengeluaran bulan ini",
       value: formatCurrency(expense),
-      detail: `${income === 0 ? 0 : Math.round((expense / income) * 100)}% dari pemasukan`,
+      detail: `${income === BigInt(0) ? 0 : Math.round(divideMoney(expense, income) * 100)}% dari pemasukan`,
       icon: ArrowUpRight,
       tone: "expense",
     },
@@ -96,7 +106,7 @@ export default function DashboardPage(): React.ReactNode {
       value: formatCurrency(remainingBudget),
       detail: `${monthlyBudgets.length} kategori bulan ini`,
       icon: PiggyBank,
-      tone: remainingBudget < 0 ? "expense" : "warning",
+      tone: isNegativeMoney(remainingBudget) ? "expense" : "warning",
     },
   ];
 
@@ -142,7 +152,7 @@ export default function DashboardPage(): React.ReactNode {
           <div className="chart-summary">
             <div>
               <span>Net cashflow</span>
-              <strong>{formatCurrency(income - expense)}</strong>
+              <strong>{formatCurrency(subtractMoney(income, expense))}</strong>
             </div>
             <span className="badge badge-income">Positif</span>
           </div>
@@ -221,13 +231,16 @@ export default function DashboardPage(): React.ReactNode {
           <div className="budget-overview-list">
             {monthlyBudgets.slice(0, 5).map((budget) => {
               const spent = calculateBudgetSpent(budget, transactions);
-              const percentage = Math.round((spent / budget.limit) * 100);
+              const percentage = Math.round(
+                divideMoney(spent, parseMoney(budget.limit)) * 100,
+              );
+              const remaining = subtractMoney(budget.limit, spent);
 
               return (
                 <div className="mini-budget" key={budget.id}>
                   <div>
                     <strong>{budget.category}</strong>
-                    <span>{formatCurrency(budget.limit - spent)} tersisa</span>
+                    <span>{formatCurrency(remaining)} tersisa</span>
                   </div>
                   <b>{percentage}%</b>
                   <div className="progress-track">
